@@ -2,26 +2,24 @@ import React, { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { addData } from "../app/resumeDataSlice";
 import { Link, redirect } from "react-router-dom";
-import { IoLocationSharp } from "react-icons/io5";
-import { FaGlobe,FaPhoneAlt,FaLinkedin } from "react-icons/fa";
+import { FaGlobe, FaPhoneAlt, FaLinkedin, FaGithub  } from "react-icons/fa";
 import { MdEmail } from "react-icons/md";
+import Modal from "./Modal";
 
 const Resume = () => {
   const dispatch = useDispatch();
   const resumeData = useSelector((store) => store.resume.info);
 
   const [personalInfo, setPersonalInfo] = useState(resumeData.personalInfo);
-
-  const [professionalSummary, setProfessionalSummary] = useState(resumeData.professionalSummary);
-
-  const [experience, setExperience] = useState(resumeData?.experience);
-
-  const [education, setEducation] = useState(resumeData?.education);
-
+  const [professionalSummary, setProfessionalSummary] = useState(
+    resumeData.professionalSummary
+  );
+  const [experience, setExperience] = useState(resumeData.experience);
+  const [education, setEducation] = useState(resumeData.education);
   const [skills, setSkills] = useState(resumeData.skills);
-
   const [projects, setProjects] = useState(resumeData.projects);
-
+  const [showModal, setShowModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
     setPersonalInfo(resumeData.personalInfo);
@@ -32,16 +30,64 @@ const Resume = () => {
     setProjects(resumeData.projects);
   }, [resumeData]);
 
-  console.log(experience)
+  //checking if user has provided all the required informations
+  const validateForm = () => {
+    if (!personalInfo.name || !personalInfo.email || !personalInfo.phone) {
+      setErrorMessage(
+        "Please fill in all required personal information fields."
+      );
+      return false;
+    }
+
+    if (!professionalSummary) {
+      setErrorMessage("Please provide a professional summary.");
+      return false;
+    }
+
+    // if (experience.some((exp) => !exp.role || !exp.company || !exp.duration || !exp.details)) {
+    //   setErrorMessage("Please fill in all fields for each experience entry.");
+    //   return false;
+    // }
+
+    if (
+      education.some((edu) => !edu.degree || !edu.institution || !edu.duration)
+    ) {
+      setErrorMessage("Please fill in all fields for each education entry.");
+      return false;
+    }
+
+    if (skills.some((skill) => !skill)) {
+      setErrorMessage("Please provide at least one skill.");
+      return false;
+    }
+
+    if (
+      projects.some(
+        (project) =>
+          !project.name ||
+          !project.technologies ||
+          project.description.some((desc) => !desc)
+      )
+    ) {
+      setErrorMessage("Please fill in all fields for each project entry.");
+      return false;
+    }
+
+    setErrorMessage("");
+    return true;
+  };
 
   const handlePersonalInfoChange = (e) => {
     setPersonalInfo({ ...personalInfo, [e.target.name]: e.target.value });
   };
 
   const handleExperienceChange = (index, e) => {
-    const newExperience = [...experience];
-    newExperience[index][e.target.name] = e.target.value;
-    setExperience(newExperience);
+    const { name, value } = e.target;
+    setExperience((prevExperience) =>
+      prevExperience.map((exp, i) =>
+        i === index ? { ...exp, [name]: value } : exp
+      )
+    );
   };
 
   const addExperience = () => {
@@ -52,9 +98,12 @@ const Resume = () => {
   };
 
   const handleEducationChange = (index, e) => {
-    const newEducation = [...education];
-    newEducation[index][e.target.name] = e.target.value;
-    setEducation(newEducation);
+    const { name, value } = e.target;
+    setEducation((prevEducation) =>
+      prevEducation.map((edu, i) =>
+        i === index ? { ...edu, [name]: value } : edu
+      )
+    );
   };
 
   const addEducation = () => {
@@ -62,9 +111,10 @@ const Resume = () => {
   };
 
   const handleSkillsChange = (index, e) => {
-    const newSkills = [...skills];
-    newSkills[index] = e.target.value;
-    setSkills(newSkills);
+    const { value } = e.target;
+    setSkills((prevSkills) =>
+      prevSkills.map((skill, i) => (i === index ? value : skill))
+    );
   };
 
   const addSkill = () => {
@@ -72,21 +122,38 @@ const Resume = () => {
   };
 
   const handleProjectsChange = (index, e) => {
-    const newProjects = [...projects];
-    newProjects[index][e.target.name] = e.target.value;
-    setProjects(newProjects);
+    const { name, value } = e.target;
+    setProjects((prevProjects) =>
+      prevProjects.map((project, i) =>
+        i === index ? { ...project, [name]: value } : project
+      )
+    );
   };
 
   const handleBulletChange = (projectIndex, bulletIndex, e) => {
-    const newProjects = [...projects];
-    newProjects[projectIndex].description[bulletIndex] = e.target.value;
-    setProjects(newProjects);
+    const { value } = e.target;
+    setProjects((prevProjects) =>
+      prevProjects.map((project, i) =>
+        i === projectIndex
+          ? {
+              ...project,
+              description: project.description.map((bullet, j) =>
+                j === bulletIndex ? value : bullet
+              ),
+            }
+          : project
+      )
+    );
   };
 
   const addBullet = (projectIndex) => {
-    const newProjects = [...projects];
-    newProjects[projectIndex].description.push("");
-    setProjects(newProjects);
+    setProjects((prevProjects) =>
+      prevProjects.map((project, i) =>
+        i === projectIndex
+          ? { ...project, description: [...project.description, ""] }
+          : project
+      )
+    );
   };
 
   const addProject = () => {
@@ -94,21 +161,27 @@ const Resume = () => {
   };
 
   const handleReview = () => {
-    const info = {
-      personalInfo: personalInfo,
-      professionalSummary: professionalSummary,
-      education: education,
-      skills: skills,
-      projects: projects,
-    };
-    dispatch(addData(info));
-    redirect("/preview");
+    if (validateForm()) {
+      const info = {
+        personalInfo: personalInfo,
+        professionalSummary: professionalSummary,
+        education: education,
+        skills: skills,
+        projects: projects,
+      };
+      //dispatching and redirecting to preview page
+      dispatch(addData(info));
+      redirect("/preview");
+    } else {
+      //showing modal and asking user to fill all the informations
+      setShowModal(true);
+    }
   };
 
   return (
     <div className="flex min-h-screen">
-      {/* Left side for input fields */}
-      <div className="w-1/2 p-8 bg-gray-100">
+      {/*Left side with form */}
+      <div className="w-1/2 p-6 bg-gray-100">
         <h2 className="text-2xl font-bold mb-4">Personal Information</h2>
         <input
           type="text"
@@ -134,7 +207,6 @@ const Resume = () => {
           placeholder="Your Phone"
           className="w-full p-2 border-b-2 focus:outline-none mb-4"
         />
-
         <input
           type="text"
           name="linkedin"
@@ -143,7 +215,6 @@ const Resume = () => {
           placeholder="Your LinkedIn profile URL"
           className="w-full p-2 border-b-2 focus:outline-none mb-4"
         />
-
         <input
           type="text"
           name="website"
@@ -157,7 +228,7 @@ const Resume = () => {
           name="address"
           value={personalInfo?.address}
           onChange={handlePersonalInfoChange}
-          placeholder="Your Address"
+          placeholder="Your Github profile URL"
           className="w-full p-2 border-b-2 focus:outline-none mb-4"
         />
 
@@ -168,49 +239,55 @@ const Resume = () => {
           placeholder="Write your professional summary here..."
           className="w-full p-2 border focus:outline-none mb-4"
         />
-        
-            <h2 className="text-2xl font-bold mb-4">Experience</h2>
-            {experience.map((exp, index) => (
-              <div key={index} className="mb-6">
-                <input
-                  type="text"
-                  name="role"
-                  value={exp.role}
-                  onChange={(e) => handleExperienceChange(index, e)}
-                  placeholder="Role"
-                  className="w-full p-2 border-b-2 focus:outline-none mb-2"
-                />
-                <input
-                  type="text"
-                  name="company"
-                  value={exp.company}
-                  onChange={(e) => handleExperienceChange(index, e)}
-                  placeholder="Company"
-                  className="w-full p-2 border-b-2 focus:outline-none mb-2"
-                />
-                <input
-                  type="text"
-                  name="duration"
-                  value={exp.duration}
-                  onChange={(e) => handleExperienceChange(index, e)}
-                  placeholder="Duration"
-                  className="w-full p-2 border-b-2 focus:outline-none mb-2"
-                />
-                <textarea
-                  name="details"
-                  value={exp.details}
-                  onChange={(e) => handleExperienceChange(index, e)}
-                  placeholder="Details"
-                  className="w-full p-2 border focus:outline-none mb-4"
-                />
-              </div>
-            ))}
-            <button
-              onClick={addExperience}
-              className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-            >
-              Add Experience
-            </button>
+
+        <div className="flex items-center gap-2">
+        <h2 className="text-2xl font-bold mb-4">Experience</h2>
+        <h3 className="mb-4 text-gray-700">{"(Optional)"}</h3>
+        </div>
+        {experience?.map((exp, index) => (
+          <div key={index} className="mb-6">
+            <input
+              type="text"
+              name="role"
+              value={exp.role}
+              onChange={(e) => handleExperienceChange(index, e)}
+              placeholder="Role"
+              className="w-full p-2 border-b-2 focus:outline-none mb-2"
+            />
+            <input
+              type="text"
+              name="company"
+              value={exp.company}
+              readOnly={false}
+              onChange={(e) => handleExperienceChange(index, e)}
+              placeholder="Company"
+              className="w-full p-2 border-b-2 focus:outline-none mb-2"
+            />
+            <input
+              type="text"
+              name="duration"
+              value={exp.duration}
+              readOnly={false}
+              onChange={(e) => handleExperienceChange(index, e)}
+              placeholder="Duration"
+              className="w-full p-2 border-b-2 focus:outline-none mb-2"
+            />
+            <textarea
+              name="details"
+              value={exp.details}
+              readOnly={false}
+              onChange={(e) => handleExperienceChange(index, e)}
+              placeholder="Details"
+              className="w-full p-2 border focus:outline-none mb-4"
+            />
+          </div>
+        ))}
+        <button
+          onClick={addExperience}
+          className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+        >
+          Add Experience
+        </button>
 
         <h2 className="text-2xl font-bold mt-8 mb-4">Projects</h2>
         {projects?.map((project, projectIndex) => (
@@ -320,19 +397,35 @@ const Resume = () => {
         </Link>
       </div>
 
-      {/* Right side for resume preview */}
+      {/* Right side with live preview of the resume and it details */}
       <div className="w-1/2 p-8 bg-white shadow-lg">
-        <header className="border-b-2 pb-6 mb-4">
-          <div className="flex justify-between items-center">
-            <h1 className="text-xl font-bold">{personalInfo?.name}</h1>
-            <div className="text-right">
-              <p className=" flex items-center gap-1"><MdEmail/>{personalInfo?.email}</p>
-              <p className=" flex items-center gap-1"><FaPhoneAlt/>{personalInfo?.phone}</p>
-              <a className=" flex items-center gap-1 "><FaGlobe/><span className="text-blue-600">{personalInfo?.website}</span></a>
+        <header className="pb-6 mb-4">
+          <div className="text-2xl font-bold mb-2 text-center">{personalInfo?.name}</div>
+          <div className="flex flex-wrap items-center gap-4 text-gray-600">
+          <div className="flex items-center gap-1">
+              <FaPhoneAlt />
+              {personalInfo?.phone}
             </div>
-          </div>
-          <div className="text-gray-600">
-            <p className=" flex items-center gap-1"><IoLocationSharp/>{personalInfo?.address}</p>
+            
+            <div className="flex items-center gap-1">
+              <FaGlobe />
+              <span className="text-blue-600">{personalInfo?.website}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <MdEmail />
+              {personalInfo?.email}
+            </div>
+            
+            
+            <div className="flex items-center gap-1">
+              <FaLinkedin />
+              {personalInfo?.linkedin}
+            </div>
+
+            <div className="flex items-center gap-1">
+              <FaGithub />
+              {personalInfo?.address}
+            </div>
           </div>
         </header>
 
@@ -343,7 +436,6 @@ const Resume = () => {
           <p className="text-sm text-gray-700">{professionalSummary}</p>
         </section>
 
-        {/* Conditionally Render Experience Section */}
         {experience?.length > 0 && (
           <section className="mb-4">
             <h2 className="text-xl font-bold mb-2 border-b-2 pb-2">
@@ -367,14 +459,16 @@ const Resume = () => {
             <div key={index} className="mb-6">
               <h3 className="text-lg font-semibold">{project.name}</h3>
               <p className="text-gray-600 mt-1 mb-1 text-sm">
-                {project.technologies && <span className="font-semibold">Technologies: </span>} {project.technologies}
+                {project.technologies && (
+                  <span className="font-semibold">Technologies: </span>
+                )}{" "}
+                {project.technologies}
               </p>
               <ul className="list-disc list-inside text-sm text-gray-700 ml-4">
                 {project.description.map((bullet, bulletIndex) => (
                   <li key={bulletIndex}>{bullet}</li>
                 ))}
               </ul>
-              
             </div>
           ))}
         </section>
@@ -391,7 +485,7 @@ const Resume = () => {
           ))}
         </section>
 
-        <section className="">
+        <section>
           <h2 className="text-xl font-bold mb-2 border-b-2 pb-2">Skills</h2>
           <ul className="list-disc list-inside text-gray-700 ml-4">
             {skills?.map((skill, index) => (
@@ -400,6 +494,21 @@ const Resume = () => {
           </ul>
         </section>
       </div>
+
+      {showModal && (
+        <Modal onClose={() => setShowModal(false)}>
+          <div className="p-4">
+            <h2 className="text-xl font-bold mb-4">Incomplete Form</h2>
+            <p>{errorMessage}</p>
+            <button
+              onClick={() => setShowModal(false)}
+              className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 mt-4"
+            >
+              Close
+            </button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 };
